@@ -8,8 +8,10 @@ import org.slf4j.LoggerFactory;
 import com.bang9634.chat.model.ChatMessage;
 import com.bang9634.chat.service.ChatRoomService;
 import com.bang9634.common.config.ServiceInjector;
+import com.bang9634.common.util.IpUtil;
 import com.bang9634.common.util.JsonUtil;
 import com.bang9634.user.model.User;
+import com.bang9634.user.service.IpBlockService;
 import com.bang9634.user.service.UserSessionManager;
 
 /**
@@ -22,6 +24,7 @@ public class ChatWebSocketHandler {
 
     private final UserSessionManager userSessionManager;
     private final ChatRoomService chatRoomService;
+    private final IpBlockService ipBlockService;
 
     /**
      * Constructor.
@@ -30,6 +33,7 @@ public class ChatWebSocketHandler {
     public ChatWebSocketHandler() {
         this.userSessionManager = ServiceInjector.getInstance(UserSessionManager.class);
         this.chatRoomService = ServiceInjector.getInstance(ChatRoomService.class);
+        this.ipBlockService = ServiceInjector.getInstance(IpBlockService.class);
     }
 
     /**
@@ -38,6 +42,21 @@ public class ChatWebSocketHandler {
      */
     @OnWebSocketConnect
     public void onConnect(Session session) {
+        String ip = IpUtil.extractIpAddress(session);
+        logger.info("New connection attempt from IP: {}", ip);
+
+        if (ipBlockService.isBlocked(ip)) {
+            logger.warn("Connection attempt from blocked IP: {}", ip);
+            try {
+                session.close(1008, "Your IP is blocked.");
+            } catch (Exception e) {
+                logger.error("Error closing blocked session: {}", e.getMessage());
+            }
+            return;
+        }
+
+
+
         logger.info("WebSocket Connected: {}", session.getRemoteAddress());
 
         User user = userSessionManager.addSession(session);

@@ -11,8 +11,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.bang9634.common.util.IdGenerator;
+import com.bang9634.common.util.IpUtil;
 import com.bang9634.common.util.NameGenerator;
 import com.bang9634.user.model.User;
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
 
 /**
@@ -25,14 +27,17 @@ public class UserSessionManager {
 
     private final Map<String, User> users; // Map of userId to User
     private final Map<Session, String> sessionToUserId; // Map of Session to userId
+    private final IpBlockService ipBlockService;
 
     /**
      * Constructor.
      * Initializes the user session manager.
      */
-    public UserSessionManager() {
+    @Inject
+    public UserSessionManager(IpBlockService ipBlockService) {
         this.users = new ConcurrentHashMap<>();
         this.sessionToUserId = new ConcurrentHashMap<>();
+        this.ipBlockService = ipBlockService;
         logger.info("UserSessionManager initialized.");
     }
 
@@ -43,15 +48,24 @@ public class UserSessionManager {
      * @return The created User object
      */
     public User addSession(Session session) {
+        String ip = IpUtil.extractIpAddress(session);
+        String maskedIp = IpUtil.getDisplayIp(ip);
+
+        // Check if IP is blocked
+        if (ipBlockService.isBlocked(ip)) {
+            logger.warn("Connection attempt from blocked IP: {}", ip);
+            return null;
+        }
+
         String userId = IdGenerator.generateUserId();
         String username = NameGenerator.generateAnonymousName();
-        User user = new User(userId, username, session);
+        User user = new User(userId, username, session, ip, maskedIp);
 
         users.put(userId, user);
         sessionToUserId.put(session, userId);
 
-        logger.info("Added new user session: {}({}), connected users {}", 
-            username, userId, users.size());
+        logger.info("Added new user session: {} {} ({}), connected users {}", 
+            username, maskedIp, userId, users.size());
         return user;
     }
 
@@ -121,6 +135,22 @@ public class UserSessionManager {
     }
 
     /**
+     * Get a list of users by IP address.
+     * 
+     * @param ip The IP address to search for
+     * @return List of User objects with the given IP address
+     */
+    public List<User> getUsersByIp(String ip) {
+        List<User> result = new ArrayList<>();
+        for (User user : users.values()) {
+            if (ip.equals(user.getIpAddress())) {
+                result.add(user);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Get a list of active usernames.
      * 
      * @return List of usernames of all connected users
@@ -129,5 +159,19 @@ public class UserSessionManager {
         List<String> usernames = new ArrayList<>();
         users.values().forEach(user -> usernames.add(user.getUsername()));
         return usernames;
+    }
+
+    public void kickByIp(String ip) {
+        List<User> usersToKick = getUsersByIp(ip);
+        logger.warn("IP {} is being kicked. Total users to kick: {}", ip, usersToKick.size());
+        for (User user : usersToKick) {
+            try {
+                if (user.getSession() != null && user.getSession().isOpen()) {
+                    user.getSession().close(1008, "You have been kicked by the administrator.");
+                }
+            } catch (Exception e) {
+                logger.error("Error kicking user {}: {}", user.getUsername(), e.getMessage());
+            }
+        }
     }
 }

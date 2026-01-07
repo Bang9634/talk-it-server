@@ -51,8 +51,8 @@ public class ChatRoomService {
     public void handleUserJoin(User user) {
         ChatMessage joinMessage = messageService.createMessage(
             user.getUserId(),
-            user.getUsername(),
-            user.getUsername() + " has joined the chat.",
+            "SYSTEM",
+            user.getDisplayName() + " has joined the chat.",
             ChatMessage.MessageType.JOIN
         );
 
@@ -67,8 +67,8 @@ public class ChatRoomService {
     public void handleUserLeave(User user) {
         ChatMessage leaveMessage = messageService.createMessage(
             user.getUserId(),
-            user.getUsername(),
-            user.getUsername() + " has left the chat.",
+            "SYSTEM",
+            user.getDisplayName() + " has left the chat.",
             ChatMessage.MessageType.LEAVE
         );
 
@@ -84,7 +84,7 @@ public class ChatRoomService {
 
         ChatMessage chatMessage = messageService.createMessage(
             sender.getUserId(),
-            sender.getUsername(),
+            sender.getDisplayName(),
             content,
             ChatMessage.MessageType.CHAT
         );

@@ -11,6 +11,8 @@ public class User {
     private String username;
     private Session session;
     private long connectedAt;
+    private String ipAddress;
+    private String maskedIp;
 
     /**
      * Parameterized constructor.
@@ -18,12 +20,16 @@ public class User {
      * @param username The username of the user
      * @param session The session associated with the user
      * @param connectedAt The timestamp when the user connected
+     * @param ipAddress The IP address of the user
+     * @param maskedIp The masked IP address for privacy
      */
-    public User(String userId, String username, Session session) {
+    public User(String userId, String username, Session session, String ipAddress, String maskedIp) {
         this.userId = userId;
         this.username = username;
         this.session = session;
         this.connectedAt = System.currentTimeMillis();
+        this.ipAddress = ipAddress;
+        this.maskedIp = maskedIp;
     }
 
     // Getters and Setters
@@ -39,11 +45,23 @@ public class User {
     public long getConnectedAt() { return connectedAt; }
     public void setConnectedAt(long connectedAt) { this.connectedAt = connectedAt; }
 
+    public String getIpAddress() { return ipAddress; }
+    public void setIpAddress(String ipAddress) { this.ipAddress = ipAddress; }
+
+    public String getMaskedIp() { return maskedIp; }
+    public void setMaskedIp(String maskedIp) { this.maskedIp = maskedIp; }
+
+    public String getDisplayName() {
+        return username + " " + maskedIp;
+    }
+
     @Override
     public String toString() {
         return "User{" +
                 "userId='" + userId + '\'' +
                 ", username='" + username + '\'' +
+                ", ipAddress='" + ipAddress + '\'' +
+                ", maskedIp='" + maskedIp + '\'' +
                 ", connectedAt=" + connectedAt +
                 '}';
     }
