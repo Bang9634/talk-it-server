@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import com.bang9634.chat.model.ChatMessage;
 import com.bang9634.chat.service.ChatRoomService;
 import com.bang9634.common.config.ServiceInjector;
+import com.bang9634.common.security.InputValidator;
+import com.bang9634.common.security.RateLimiter;
 import com.bang9634.common.util.IpUtil;
 import com.bang9634.common.util.JsonUtil;
 import com.bang9634.user.model.User;
@@ -25,6 +27,7 @@ public class ChatWebSocketHandler {
     private final UserSessionManager userSessionManager;
     private final ChatRoomService chatRoomService;
     private final IpBlockService ipBlockService;
+    private final RateLimiter rateLimiter;
 
     /**
      * Constructor.
@@ -34,6 +37,7 @@ public class ChatWebSocketHandler {
         this.userSessionManager = ServiceInjector.getInstance(UserSessionManager.class);
         this.chatRoomService = ServiceInjector.getInstance(ChatRoomService.class);
         this.ipBlockService = ServiceInjector.getInstance(IpBlockService.class);
+        this.rateLimiter = ServiceInjector.getInstance(RateLimiter.class);
     }
 
     /**
@@ -45,25 +49,35 @@ public class ChatWebSocketHandler {
         String ip = IpUtil.extractIpAddress(session);
         logger.info("New connection attempt from IP: {}", ip);
 
-        if (ipBlockService.isBlocked(ip)) {
-            logger.warn("Connection attempt from blocked IP: {}", ip);
-            try {
-                session.close(1008, "Your IP is blocked.");
-            } catch (Exception e) {
-                logger.error("Error closing blocked session: {}", e.getMessage());
-            }
+        // Rate limiting check
+        if (!rateLimiter.allowConnection(ip)) {
+            logger.warn("Rate limit exceeded for IP: {}", ip);
+            closeSession(session, 1008, "Rate limit exceeded.");
             return;
         }
 
-
+        // Check if IP is blocked
+        if (ipBlockService.isBlocked(ip)) {
+            logger.warn("Connection attempt from blocked IP: {}", ip);
+            closeSession(session, 1008, "Your IP is blocked.");
+            return;
+        }
 
         logger.info("WebSocket Connected: {}", session.getRemoteAddress());
 
+        // Add user session
         User user = userSessionManager.addSession(session);
+
+        // If user is null, it means the session was rejected (e.g., blocked IP)
+        if (user == null) {
+            logger.warn("Failed to add user session for IP: {}", ip);
+            closeSession(session, 1008, "Connection rejected.");
+            return;
+        }
         chatRoomService.handleUserJoin(user);
 
         logger.info("User connected: {} ({}), total users: {}",
-            user.getUsername(), user.getUserId(), userSessionManager.getUserCount());
+            user.getDisplayName(), user.getUserId(), userSessionManager.getUserCount());
     }
 
     /**
@@ -82,6 +96,13 @@ public class ChatWebSocketHandler {
             return;
         }
 
+        String ip = sender.getIpAddress();
+
+        if (!rateLimiter.allowMessage(ip)) {
+            logger.warn("Rate limit exceeded for IP: {}", ip);
+            return;
+        }
+
         try {
             ChatMessage chatMessage = JsonUtil.fromJson(message, ChatMessage.class);
 
@@ -91,7 +112,9 @@ public class ChatWebSocketHandler {
                 return;
             }
 
-            chatRoomService.handleChatMessage(sender, chatMessage.getContent());
+            String sanitizedContent = InputValidator.sanitizeHtml(chatMessage.getContent());
+
+            chatRoomService.handleChatMessage(sender, sanitizedContent);
         } catch (Exception e) {
             logger.error("Error processing message from user {}: {}",
                 sender.getUsername(), e.getMessage());
@@ -131,6 +154,23 @@ public class ChatWebSocketHandler {
         User user = userSessionManager.getUserBySession(session);
         if (user != null) {
             userSessionManager.removeSession(session);
+        }
+    }
+
+    /**
+     * Close a WebSocket session with a given status code and reason.
+     * 
+     * @param session The WebSocket session to close
+     * @param statusCode The status code for closure
+     * @param reason The reason for closure
+     */
+    private void closeSession(Session session, int statusCode, String reason) {
+        try {
+            if (session != null && session.isOpen()) {
+                session.close(statusCode, reason);
+            }
+        } catch (Exception e) {
+            logger.error("Error closing session {}: {}", reason, e);
         }
     }
 }

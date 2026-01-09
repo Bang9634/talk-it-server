@@ -13,7 +13,6 @@ public class ChatMessage {
     private String content;
     private LocalDateTime timestamp;
     private MessageType type;
-
     /**
      * Enum representing the type of chat message.
      * <ul>
@@ -22,7 +21,6 @@ public class ChatMessage {
      *  <li>LEAVE: User left the chat</li>
      *  <li>SYSTEM: System message</li>
      * </ul>
-     * 
      */
     public enum MessageType {
         JOIN,   // User joined the chat
