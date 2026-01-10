@@ -1,11 +1,15 @@
 package com.bang9634.websocket;
 
+import java.io.IOException;
+
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.annotations.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.bang9634.chat.model.ChatMessage;
+import com.bang9634.chat.model.MessageRequest;
+import com.bang9634.chat.model.UserListResponse;
 import com.bang9634.chat.service.ChatRoomService;
 import com.bang9634.common.config.ServiceInjector;
 import com.bang9634.common.security.InputValidator;
@@ -66,7 +70,7 @@ public class ChatWebSocketHandler {
         logger.info("WebSocket Connected: {}", session.getRemoteAddress());
 
         // Add user session
-        User user = userSessionManager.addSession(session);
+        User user = userSessionManager.addSessionAnnonymousUser(session);
 
         // If user is null, it means the session was rejected (e.g., blocked IP)
         if (user == null) {
@@ -75,6 +79,9 @@ public class ChatWebSocketHandler {
             return;
         }
         chatRoomService.handleUserJoin(user);
+
+        sendUserList(session);
+        broadcastUserList();
 
         logger.info("User connected: {} ({}), total users: {}",
             user.getDisplayName(), user.getUserId(), userSessionManager.getUserCount());
@@ -104,6 +111,20 @@ public class ChatWebSocketHandler {
         }
 
         try {
+            MessageRequest messageRequest = JsonUtil.fromJson(message, MessageRequest.class);
+
+            if (messageRequest == null) {
+                logger.warn("Failed to parse meessage request");
+                return;
+            }
+
+            if (messageRequest.isUserListRequest()) {
+                logger.info("User list requested by: {}", sender.getUsername());
+                sendUserList(session);
+                return;
+            }
+
+
             ChatMessage chatMessage = JsonUtil.fromJson(message, ChatMessage.class);
 
             if (chatMessage == null || chatMessage.getContent() == null) {
@@ -136,6 +157,8 @@ public class ChatWebSocketHandler {
         if (user != null) {
             chatRoomService.handleUserLeave(user);
             userSessionManager.removeSession(session);
+
+            broadcastUserList();
 
             logger.info("User disconnected: {} ({}), total users: {}",
                 user.getUsername(), user.getUserId(), userSessionManager.getUserCount());
@@ -172,5 +195,35 @@ public class ChatWebSocketHandler {
         } catch (Exception e) {
             logger.error("Error closing session {}: {}", reason, e);
         }
+    }
+
+    private void sendUserList(Session session) {
+        try {
+            if (session != null && session.isOpen()) {
+                UserListResponse userList = userSessionManager.getUserListResponse();
+                String jsonResponse = JsonUtil.toJson(userList);
+                session.getRemote().sendString(jsonResponse);
+                logger.debug("Sent user list to session {}: {}",
+                    session.getRemoteAddress(), userList.getTotalCount());
+            }
+        } catch (IOException e) {
+            logger.error("Failed to send user list", e);
+        }
+    }
+
+    private void broadcastUserList() {
+        UserListResponse userList = userSessionManager.getUserListResponse();
+        String jsonResponse = JsonUtil.toJson(userList);
+
+        userSessionManager.getAllUsers().forEach(user -> {
+            try {
+                if (user.getSession() != null && user.getSession().isOpen()) {
+                    user.getSession().getRemote().sendString(jsonResponse);
+                }
+            } catch (IOException e) {
+                logger.error("Failed to broadcast user list to user: {}", user.getUsername());
+            }
+        });
+        logger.debug("Broadcasted user list: {} users", userList.getTotalCount());
     }
 }

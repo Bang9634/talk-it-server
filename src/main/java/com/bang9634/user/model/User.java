@@ -13,6 +13,7 @@ public class User {
     private long connectedAt;
     private String ipAddress;
     private String maskedIp;
+    private boolean isAuthenticated;
 
     /**
      * Parameterized constructor.
@@ -23,13 +24,15 @@ public class User {
      * @param ipAddress The IP address of the user
      * @param maskedIp The masked IP address for privacy
      */
-    public User(String userId, String username, Session session, String ipAddress, String maskedIp) {
+    public User(String userId, String username, Session session, String ipAddress, 
+                String maskedIp, boolean isAuthenticated) {
         this.userId = userId;
         this.username = username;
         this.session = session;
         this.connectedAt = System.currentTimeMillis();
         this.ipAddress = ipAddress;
         this.maskedIp = maskedIp;
+        this.isAuthenticated = isAuthenticated;
     }
 
     // Getters and Setters
@@ -51,9 +54,18 @@ public class User {
     public String getMaskedIp() { return maskedIp; }
     public void setMaskedIp(String maskedIp) { this.maskedIp = maskedIp; }
 
+    public boolean isAuthenticated() { return isAuthenticated; }
+    public void setAuthenticated(boolean authenticated) { isAuthenticated = authenticated; }
+
     public String getDisplayName() {
-        return username + " " + maskedIp;
+        if (isAuthenticated) {
+            return username;
+        }
+        else {
+            return username + " " + maskedIp;
+        }
     }
+    
 
     @Override
     public String toString() {
@@ -62,7 +74,8 @@ public class User {
                 ", username='" + username + '\'' +
                 ", ipAddress='" + ipAddress + '\'' +
                 ", maskedIp='" + maskedIp + '\'' +
-                ", connectedAt=" + connectedAt +
+                ", connectedAt=" + connectedAt + '\'' +
+                ", isAuthenticated=" + isAuthenticated +
                 '}';
     }
 }

@@ -17,9 +17,7 @@ public class NameGenerator {
      * @see NameConstants
      */
     public static String generateAnonymousName() {
-        String adjective = NameConstants.ADJECTIVES[random.nextInt(NameConstants.ADJECTIVES.length)];
-        String noun = NameConstants.NOUNS[random.nextInt(NameConstants.NOUNS.length)];
-        return adjective + " " + noun;
+        return "Guest" + (new Random().nextInt(10000));
     }
 
     private NameGenerator() {

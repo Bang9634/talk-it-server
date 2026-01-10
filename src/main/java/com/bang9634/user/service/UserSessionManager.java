@@ -10,6 +10,7 @@ import org.eclipse.jetty.websocket.api.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.bang9634.chat.model.UserListResponse;
 import com.bang9634.common.util.IdGenerator;
 import com.bang9634.common.util.IpUtil;
 import com.bang9634.common.util.NameGenerator;
@@ -47,7 +48,7 @@ public class UserSessionManager {
      * @param session The WebSocket session
      * @return The created User object
      */
-    public User addSession(Session session) {
+    public User addSessionAnnonymousUser(Session session) {
         String ip = IpUtil.extractIpAddress(session);
         String maskedIp = IpUtil.getDisplayIp(ip);
 
@@ -59,7 +60,7 @@ public class UserSessionManager {
 
         String userId = IdGenerator.generateUserId();
         String username = NameGenerator.generateAnonymousName();
-        User user = new User(userId, username, session, ip, maskedIp);
+        User user = new User(userId, username, session, ip, maskedIp, false);
 
         users.put(userId, user);
         sessionToUserId.put(session, userId);
@@ -173,5 +174,21 @@ public class UserSessionManager {
                 logger.error("Error kicking user {}: {}", user.getUsername(), e.getMessage());
             }
         }
+    }
+
+    public UserListResponse getUserListResponse() {
+        List<UserListResponse.UserInfo> userInfoList = new ArrayList<>();
+
+        for (User user : users.values()) {
+            UserListResponse.UserInfo userInfo = new UserListResponse.UserInfo(
+                user.getUserId(),
+                user.getUsername(),
+                user.getMaskedIp(),
+                user.getConnectedAt(),
+                user.isAuthenticated()
+            );
+            userInfoList.add(userInfo);
+        }
+        return new UserListResponse(userInfoList, users.size());
     }
 }
