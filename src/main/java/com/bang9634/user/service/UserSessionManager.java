@@ -162,6 +162,11 @@ public class UserSessionManager {
         return usernames;
     }
 
+    /**
+     * Kick all users by IP address.
+     * 
+     * @param ip The IP address whose users should be kicked
+     */
     public void kickByIp(String ip) {
         List<User> usersToKick = getUsersByIp(ip);
         logger.warn("IP {} is being kicked. Total users to kick: {}", ip, usersToKick.size());
@@ -176,6 +181,11 @@ public class UserSessionManager {
         }
     }
 
+    /**
+     * Get the user list response for broadcasting.
+     * 
+     * @return UserListResponse object containing user info
+     */
     public UserListResponse getUserListResponse() {
         List<UserListResponse.UserInfo> userInfoList = new ArrayList<>();
 

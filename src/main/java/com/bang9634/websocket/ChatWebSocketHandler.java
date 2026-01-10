@@ -197,6 +197,11 @@ public class ChatWebSocketHandler {
         }
     }
 
+    /**
+     * Send the current user list to a specific session.
+     * 
+     * @param session The WebSocket session to send the user list to
+     */
     private void sendUserList(Session session) {
         try {
             if (session != null && session.isOpen()) {
@@ -211,6 +216,9 @@ public class ChatWebSocketHandler {
         }
     }
 
+    /**
+     * Broadcast the current user list to all connected users.
+     */
     private void broadcastUserList() {
         UserListResponse userList = userSessionManager.getUserListResponse();
         String jsonResponse = JsonUtil.toJson(userList);

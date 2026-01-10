@@ -109,6 +109,7 @@ public class InputValidator {
     }
     
     private InputValidator() {
+        // Prevent instantiation
         throw new AssertionError("Cannot instantiate InputValidator");
     }
 }
