@@ -17,7 +17,7 @@ public class NameGenerator {
      * @see NameConstants
      */
     public static String generateAnonymousName() {
-        return "Guest" + (new Random().nextInt(10000));
+        return "Guest" + (random.nextInt(10000));
     }
 
     private NameGenerator() {

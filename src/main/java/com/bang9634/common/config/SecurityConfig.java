@@ -6,6 +6,8 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.bang9634.common.util.ConfigUtil.getEnvOrDefault;
+
 /**
  * Security configuration class.
  * Manages CORS settings and environment-specific security configurations.
@@ -16,8 +18,8 @@ public class SecurityConfig {
     // Define allowed origins for CORS
     private static final Set<String> ALLOWED_ORIGINS = new HashSet<>();
 
-    private static final String ENVIRONMENT = System.getenv().getOrDefault("TALK_IT_ENV", "development");
-    private static final boolean IS_PRODUCTION = ENVIRONMENT.equals("production");
+    public static final String ENVIRONMENT = getEnvOrDefault("TALK_IT_ENV", "development");
+    public static final boolean IS_PRODUCTION = ENVIRONMENT.equals("production");
 
     /**
      * Static initializer to set up allowed origins based on environment.
@@ -37,8 +39,8 @@ public class SecurityConfig {
      */
     private static void initializeAllowedOrigins() {
         if (IS_PRODUCTION) {
-            String allowedOriginsEnv = System.getenv("ALLOWED_ORIGINS");
-            if (allowedOriginsEnv != null && !allowedOriginsEnv.isEmpty()) {
+            String allowedOriginsEnv = getEnvOrDefault("ALLOWED_ORIGINS", "");
+            if (!allowedOriginsEnv.trim().isEmpty()) {
                 String[] origins = allowedOriginsEnv.split(",");
                 for (String origin : origins) {
                     ALLOWED_ORIGINS.add(origin.trim());
@@ -79,31 +81,8 @@ public class SecurityConfig {
         return false;
     }
 
-    /**
-     * Get the set of allowed origins.
-     * 
-     * @return Set of allowed origins
-     */
     public static Set<String> getAllowedOrigins() {
         return new HashSet<>(ALLOWED_ORIGINS);
-    }
-
-    /**
-     * Check if the application is running in production environment.
-     * 
-     * @return True if in production, false otherwise
-     */
-    public static boolean isProduction() {
-        return IS_PRODUCTION;
-    }
-
-    /**
-     * Get the current environment.
-     * 
-     * @return The environment string
-     */
-    public static String getEnvironment() {
-        return ENVIRONMENT;
     }
 
     private SecurityConfig() {

@@ -5,14 +5,14 @@ import org.slf4j.LoggerFactory;
 
 import java.util.regex.Pattern;
 
+import static com.bang9634.common.config.ApplicationConfig.MAX_MESSAGE_LENGTH;
+import static com.bang9634.common.config.ApplicationConfig.MIN_MESSAGE_LENGTH;
+
 /**
  * Input validation utility to prevent XSS and injection attacks.
  */
 public class InputValidator {
     private static final Logger logger = LoggerFactory.getLogger(InputValidator.class);
-    
-    private static final int MAX_MESSAGE_LENGTH = 500;
-    private static final int MIN_MESSAGE_LENGTH = 1;
     
     // Dangerous patterns for XSS detection
     private static final Pattern[] DANGEROUS_PATTERNS = {

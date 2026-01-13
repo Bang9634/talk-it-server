@@ -8,15 +8,17 @@ import org.eclipse.jetty.websocket.server.config.JettyWebSocketServletContainerI
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bang9634.common.config.ServiceInjector;
 import com.bang9634.common.database.ConnectionPool;
 import com.bang9634.common.database.DatabaseInitializer;
+import com.bang9634.common.di.ServiceInjector;
 import com.bang9634.websocket.ChatWebSocketHandler;
+
+import static com.bang9634.common.config.ApplicationConfig.PORT;
+import static com.bang9634.common.config.ApplicationConfig.WEBSOCKET_PATH;
 
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
-    private static final String WEBSOCKET_PATH = "/chat";
-    private static final int PORT = Integer.parseInt(System.getenv().getOrDefault("TALK_IT_PORT", "8080"));
+    
     public static void main(String[] args) {
         logger.info("Starting Talk_It Server...");
 

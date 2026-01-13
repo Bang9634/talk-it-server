@@ -11,7 +11,7 @@ import com.bang9634.chat.model.ChatMessage;
 import com.bang9634.chat.model.MessageRequest;
 import com.bang9634.chat.model.UserListResponse;
 import com.bang9634.chat.service.ChatRoomService;
-import com.bang9634.common.config.ServiceInjector;
+import com.bang9634.common.di.ServiceInjector;
 import com.bang9634.common.security.InputValidator;
 import com.bang9634.common.security.RateLimiter;
 import com.bang9634.common.util.IpUtil;

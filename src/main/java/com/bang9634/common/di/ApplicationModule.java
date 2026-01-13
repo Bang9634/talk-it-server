@@ -1,9 +1,8 @@
-package com.bang9634.common.config;
+package com.bang9634.common.di;
 
 import com.bang9634.chat.service.ChatRoomService;
 import com.bang9634.chat.service.MessageService;
 import com.bang9634.common.database.ConnectionPool;
-import com.bang9634.common.database.DatabaseConfig;
 import com.bang9634.common.database.DatabaseInitializer;
 import com.bang9634.common.database.TransactionManager;
 import com.bang9634.common.security.RateLimiter;
@@ -27,7 +26,6 @@ public class ApplicationModule extends AbstractModule {
     @Override
     protected void configure() {
         // common/database
-        bind(DatabaseConfig.class).asEagerSingleton();
         bind(ConnectionPool.class).asEagerSingleton();
         bind(DatabaseInitializer.class).asEagerSingleton();
         bind(TransactionManager.class).asEagerSingleton();

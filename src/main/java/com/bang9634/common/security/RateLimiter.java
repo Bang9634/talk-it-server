@@ -11,6 +11,10 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.bang9634.common.config.ApplicationConfig.MAX_MESSAGE_REQUESTS_PER_MINUTE;
+import static com.bang9634.common.config.ApplicationConfig.MAX_CONNECT_REQUESTS_PER_MINUTE;
+import static com.bang9634.common.config.ApplicationConfig.RATE_LIMIT_CLEANUP_INTERVAL_MINUTES;
+
 /**
  * RateLimiter class to limit the rate of messages and connections per IP address.
  * Implements a token bucket algorithm for rate limiting.
@@ -19,9 +23,7 @@ import org.slf4j.LoggerFactory;
 public class RateLimiter {
     private static final Logger logger = LoggerFactory.getLogger(RateLimiter.class);
 
-    private static final int MAX_MESSAGES_PER_MINUTE = 30;
-    private static final int MAX_CONNECTIONS_PER_MINUTE = 5;
-    private static final long CLEANUP_INTERVAL_MINUTE = 10;
+
 
     private final Map<String, MessageWindow> messageWindows = new ConcurrentHashMap<>();
     private final Map<String, ConnectionWindow> connectionWindows = new ConcurrentHashMap<>();
@@ -35,11 +37,11 @@ public class RateLimiter {
         // Schedule periodic cleanup of old entries
         cleanupScheduler.scheduleAtFixedRate(
             this::cleanup, 
-            MAX_CONNECTIONS_PER_MINUTE, 
-            CLEANUP_INTERVAL_MINUTE,
+            MAX_CONNECT_REQUESTS_PER_MINUTE, 
+            RATE_LIMIT_CLEANUP_INTERVAL_MINUTES,
             TimeUnit.MINUTES);
         logger.info("RateLimiter initialized. - messages/min: {}, connections/min: {}",
-            MAX_MESSAGES_PER_MINUTE, MAX_CONNECTIONS_PER_MINUTE);
+            MAX_MESSAGE_REQUESTS_PER_MINUTE, MAX_CONNECT_REQUESTS_PER_MINUTE);
     }
 
     /**
@@ -102,7 +104,7 @@ public class RateLimiter {
      * Inner class representing a sliding window for message rate limiting.
      */
     private static class MessageWindow {
-        private final long[] timestamps = new long[MAX_MESSAGES_PER_MINUTE];
+        private final long[] timestamps = new long[MAX_MESSAGE_REQUESTS_PER_MINUTE];
         private int index = 0;
         private long lastAccessTime = System.currentTimeMillis();
         
@@ -119,13 +121,13 @@ public class RateLimiter {
                 }
             }
             
-            if (count >= MAX_MESSAGES_PER_MINUTE) {
+            if (count >= MAX_MESSAGE_REQUESTS_PER_MINUTE) {
                 return false; // Rate limit exceeded
             }
             
             // Record the new message timestamp
             timestamps[index] = now;
-            index = (index + 1) % MAX_MESSAGES_PER_MINUTE;
+            index = (index + 1) % MAX_MESSAGE_REQUESTS_PER_MINUTE;
             return true;
         }
         
@@ -138,7 +140,7 @@ public class RateLimiter {
      * Inner class representing a sliding window for connection rate limiting.
      */
     private static class ConnectionWindow {
-        private final long[] timestamps = new long[MAX_CONNECTIONS_PER_MINUTE];
+        private final long[] timestamps = new long[MAX_CONNECT_REQUESTS_PER_MINUTE];
         private int index = 0;
         private long lastAccessTime = System.currentTimeMillis();
         
@@ -154,12 +156,12 @@ public class RateLimiter {
                 }
             }
             
-            if (count >= MAX_CONNECTIONS_PER_MINUTE) {
+            if (count >= MAX_CONNECT_REQUESTS_PER_MINUTE) {
                 return false;
             }
             
             timestamps[index] = now;
-            index = (index + 1) % MAX_CONNECTIONS_PER_MINUTE;
+            index = (index + 1) % MAX_CONNECT_REQUESTS_PER_MINUTE;
             return true;
         }
         
@@ -177,8 +179,8 @@ public class RateLimiter {
         return Map.of(
             "trackedMessageIps", messageWindows.size(),
             "trackedConnectionIps", connectionWindows.size(),
-            "maxMessagesPerMinute", MAX_MESSAGES_PER_MINUTE,
-            "maxConnectionsPerMinute", MAX_CONNECTIONS_PER_MINUTE
+            "maxMessagesPerMinute", MAX_MESSAGE_REQUESTS_PER_MINUTE,
+            "maxConnectionsPerMinute", MAX_CONNECT_REQUESTS_PER_MINUTE
         );
     }
 

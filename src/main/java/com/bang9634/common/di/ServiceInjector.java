@@ -1,4 +1,4 @@
-package com.bang9634.common.config;
+package com.bang9634.common.di;
 
 
 import org.slf4j.Logger;

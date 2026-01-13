@@ -1,5 +1,6 @@
 package com.bang9634.common.database;
 
+import com.bang9634.common.config.DatabaseConfig;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.zaxxer.hikari.HikariConfig;
@@ -20,16 +21,9 @@ public class ConnectionPool {
     private static final Logger logger = LoggerFactory.getLogger(ConnectionPool.class);
 
     private final HikariDataSource dataSource;
-    private final DatabaseConfig databaseConfig;
 
     @Inject
-    public ConnectionPool(DatabaseConfig databaseConfig) {
-        this.databaseConfig = databaseConfig;
-        
-        if (!databaseConfig.validate()) {
-            throw new IllegalStateException("Invalid database configuration");
-        }
-
+    public ConnectionPool() {
         this.dataSource = initializeDataSource();
         logger.info("ConnectionPool initialized successfully.");
     }
@@ -39,18 +33,17 @@ public class ConnectionPool {
             HikariConfig config = new HikariConfig();
 
             // basic settings
-            config.setJdbcUrl(databaseConfig.getJdbcUrl());
-            config.setUsername(databaseConfig.getUsername());
-            config.setPassword(databaseConfig.getPassword());
-            config.setDriverClassName(databaseConfig.getDriverClassName());
+            config.setJdbcUrl(DatabaseConfig.JDBC_URL);
+            config.setUsername(DatabaseConfig.USERNAME);
+            config.setPassword(DatabaseConfig.PASSWORD);
+            config.setDriverClassName(DatabaseConfig.DRIVER_CLASS_NAME);
 
             // Pool settings
-            config.setMaximumPoolSize(databaseConfig.getMaximumPoolSize());
-            config.setMinimumIdle(databaseConfig.getMinimumIdle());
-            config.setConnectionTimeout(databaseConfig.getConnectionTimeout());
-            config.setIdleTimeout(databaseConfig.getIdleTimeout());
-            config.setMaxLifetime(databaseConfig.getMaxLifetime());
-
+            config.setMaximumPoolSize(DatabaseConfig.MAXIMUM_POOL_SIZE);
+            config.setMinimumIdle(DatabaseConfig.MINIMUM_IDLE);
+            config.setConnectionTimeout(DatabaseConfig.CONNECTION_TIMEOUT);
+            config.setIdleTimeout(DatabaseConfig.IDLE_TIMEOUT);
+            config.setMaxLifetime(DatabaseConfig.MAX_LIFETIME);
             // Performance settings
             config.setAutoCommit(true);
             config.setConnectionTestQuery("SELECT 1");
@@ -70,7 +63,7 @@ public class ConnectionPool {
             config.addDataSourceProperty("elideSetAutoCommits", "true");
             config.addDataSourceProperty("maintainTimeStats", "false");
 
-            logger.info("Initializing HikariCP with config: {}", databaseConfig);
+            logger.info("Initializing HikariCP with config");
             return new HikariDataSource(config);
         } catch (Exception e) {
             logger.error("Failed to initialize HikariCP: {}", e.getMessage());
