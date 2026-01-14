@@ -1,8 +1,11 @@
 package com.bang9634.common.di;
 
+import javax.sql.DataSource;
+
 import com.bang9634.chat.service.ChatRoomService;
 import com.bang9634.chat.service.MessageService;
 import com.bang9634.common.database.ConnectionPool;
+import com.bang9634.common.database.DataSourceProvider;
 import com.bang9634.common.database.DatabaseInitializer;
 import com.bang9634.common.database.TransactionManager;
 import com.bang9634.common.security.RateLimiter;
@@ -25,6 +28,8 @@ public class ApplicationModule extends AbstractModule {
      */
     @Override
     protected void configure() {
+        bind(DataSource.class).toProvider(DataSourceProvider.class).asEagerSingleton();
+
         // common/database
         bind(ConnectionPool.class).asEagerSingleton();
         bind(DatabaseInitializer.class).asEagerSingleton();

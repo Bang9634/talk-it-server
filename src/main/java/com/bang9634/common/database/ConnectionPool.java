@@ -1,13 +1,13 @@
 package com.bang9634.common.database;
 
-import com.bang9634.common.config.DatabaseConfig;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+
+import javax.sql.DataSource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,64 +20,25 @@ import org.slf4j.LoggerFactory;
 public class ConnectionPool {
     private static final Logger logger = LoggerFactory.getLogger(ConnectionPool.class);
 
-    private final HikariDataSource dataSource;
+    private final DataSource dataSource;
 
     @Inject
-    public ConnectionPool() {
-        this.dataSource = initializeDataSource();
+    public ConnectionPool(DataSource dataSource) {
+        this.dataSource = dataSource;
         logger.info("ConnectionPool initialized successfully.");
-    }
-
-    private HikariDataSource initializeDataSource() {
-        try {
-            HikariConfig config = new HikariConfig();
-
-            // basic settings
-            config.setJdbcUrl(DatabaseConfig.JDBC_URL);
-            config.setUsername(DatabaseConfig.USERNAME);
-            config.setPassword(DatabaseConfig.PASSWORD);
-            config.setDriverClassName(DatabaseConfig.DRIVER_CLASS_NAME);
-
-            // Pool settings
-            config.setMaximumPoolSize(DatabaseConfig.MAXIMUM_POOL_SIZE);
-            config.setMinimumIdle(DatabaseConfig.MINIMUM_IDLE);
-            config.setConnectionTimeout(DatabaseConfig.CONNECTION_TIMEOUT);
-            config.setIdleTimeout(DatabaseConfig.IDLE_TIMEOUT);
-            config.setMaxLifetime(DatabaseConfig.MAX_LIFETIME);
-            // Performance settings
-            config.setAutoCommit(true);
-            config.setConnectionTestQuery("SELECT 1");
-
-            // Pool name
-            config.setPoolName("TalkIt-HikariCP");
-
-            // Additional settings for MySQL
-            config.addDataSourceProperty("cachePrepStmts", "true");
-            config.addDataSourceProperty("prepStmtCacheSize", "250");
-            config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-            config.addDataSourceProperty("useServerPrepStmts", "true");
-            config.addDataSourceProperty("useLocalSessionState", "true");
-            config.addDataSourceProperty("rewriteBatchedStatements", "true");
-            config.addDataSourceProperty("cacheResultSetMetadata", "true");
-            config.addDataSourceProperty("cacheServerConfiguration", "true");
-            config.addDataSourceProperty("elideSetAutoCommits", "true");
-            config.addDataSourceProperty("maintainTimeStats", "false");
-
-            logger.info("Initializing HikariCP with config");
-            return new HikariDataSource(config);
-        } catch (Exception e) {
-            logger.error("Failed to initialize HikariCP: {}", e.getMessage());
-            throw new RuntimeException("Failed to initialize database connection pool", e);
-        }
     }
 
     public Connection getConnection() throws SQLException {
         try {
             Connection connection = dataSource.getConnection();
-            logger.debug("Connection obtained from pool. Active: {}, Idle: {}, Total: {}",
-                dataSource.getHikariPoolMXBean().getActiveConnections(),
-                dataSource.getHikariPoolMXBean().getIdleConnections(),
-                dataSource.getHikariPoolMXBean().getTotalConnections());
+
+            if (dataSource instanceof HikariDataSource) {
+                HikariDataSource hikariDataSource = (HikariDataSource) dataSource;
+                logger.debug("Connection obtained from pool. Active: {}, Idle: {}, Total: {}",
+                hikariDataSource.getHikariPoolMXBean().getActiveConnections(),
+                hikariDataSource.getHikariPoolMXBean().getIdleConnections(),
+                hikariDataSource.getHikariPoolMXBean().getTotalConnections());
+            }
 
             return connection;
         } catch (SQLException e) {
@@ -102,21 +63,30 @@ public class ConnectionPool {
     }
 
     public String getPoolStats() {
-        if (dataSource.isClosed()) {
+        if (!(dataSource instanceof HikariDataSource)) {
+            return "Pool stats not available for  " + dataSource.getClass().getSimpleName();
+        }
+
+        HikariDataSource hikariDataSource = (HikariDataSource) dataSource;
+
+        if (hikariDataSource.isClosed()) {
             return "Connection pool is closed.";
         }
 
         return String.format(
             "HikariCP Stats - Active: %d, Idle: %d, Total: %d, Waiting: %d",
-            dataSource.getHikariPoolMXBean().getActiveConnections(),
-            dataSource.getHikariPoolMXBean().getIdleConnections(),
-            dataSource.getHikariPoolMXBean().getTotalConnections(),
-            dataSource.getHikariPoolMXBean().getThreadsAwaitingConnection()
+            hikariDataSource.getHikariPoolMXBean().getActiveConnections(),
+            hikariDataSource.getHikariPoolMXBean().getIdleConnections(),
+            hikariDataSource.getHikariPoolMXBean().getTotalConnections(),
+            hikariDataSource.getHikariPoolMXBean().getThreadsAwaitingConnection()
         );
     }
 
     public boolean isClosed() {
-        return dataSource.isClosed();
+        if (dataSource instanceof HikariDataSource) {
+            return ((HikariDataSource) dataSource).isClosed();
+        }
+        return false;
     }
 
     /**
@@ -124,15 +94,19 @@ public class ConnectionPool {
      * @apiNote Should be called on application shutdown
      */
     public void close() {
-        if (dataSource != null && !dataSource.isClosed()) {
-            logger.info("Closing connection pool...");
-            logger.info("Final stats: {}", getPoolStats());
-            dataSource.close();
-            logger.info("Connection pool closed successfully.");
+        if (dataSource instanceof HikariDataSource) {
+            HikariDataSource hikariDataSource = (HikariDataSource) dataSource;
+            if (hikariDataSource != null && !hikariDataSource.isClosed()) {
+                logger.info("Closing connection pool...");
+                logger.info("Final stats: {}", getPoolStats());
+                hikariDataSource.close();
+                logger.info("Connection pool closed successfully.");
+            }
         }
+
     }
 
-    public HikariDataSource getDataSource() {
+    public DataSource getDataSource() {
         return dataSource;
     }
 }
