@@ -7,18 +7,12 @@ import org.eclipse.jetty.websocket.api.annotations.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.bang9634.chat.model.ChatMessage;
-import com.bang9634.chat.model.MessageRequest;
 import com.bang9634.chat.model.UserListResponse;
-import com.bang9634.chat.service.ChatRoomService;
 import com.bang9634.common.di.ServiceInjector;
-import com.bang9634.common.security.InputValidator;
-import com.bang9634.common.security.RateLimiter;
-import com.bang9634.common.util.IpUtil;
 import com.bang9634.common.util.JsonUtil;
-import com.bang9634.user.model.User;
-import com.bang9634.user.service.IpBlockService;
-import com.bang9634.user.service.UserSessionManager;
+import com.bang9634.websocket.service.WebSocketConnectionService;
+import com.bang9634.websocket.service.WebSocketConnectionService.ConnectionResult;
+import com.bang9634.websocket.service.WebSocketConnectionService.MessageResult;
 
 /**
  * WebSocket handler for managing chat connections and messages.
@@ -28,20 +22,14 @@ import com.bang9634.user.service.UserSessionManager;
 public class ChatWebSocketHandler {
     private static final Logger logger = LoggerFactory.getLogger(ChatWebSocketHandler.class);
 
-    private final UserSessionManager userSessionManager;
-    private final ChatRoomService chatRoomService;
-    private final IpBlockService ipBlockService;
-    private final RateLimiter rateLimiter;
+    private final WebSocketConnectionService webSocketConnectionService;
 
     /**
      * Constructor.
      * Initializes services via dependency injection.
      */
     public ChatWebSocketHandler() {
-        this.userSessionManager = ServiceInjector.getInstance(UserSessionManager.class);
-        this.chatRoomService = ServiceInjector.getInstance(ChatRoomService.class);
-        this.ipBlockService = ServiceInjector.getInstance(IpBlockService.class);
-        this.rateLimiter = ServiceInjector.getInstance(RateLimiter.class);
+        this.webSocketConnectionService = ServiceInjector.getInstance(WebSocketConnectionService.class);
     }
 
     /**
@@ -50,41 +38,14 @@ public class ChatWebSocketHandler {
      */
     @OnWebSocketConnect
     public void onConnect(Session session) {
-        String ip = IpUtil.extractIpAddress(session);
-        logger.info("New connection attempt from IP: {}", ip);
+        ConnectionResult result = webSocketConnectionService.handleConnection(session);
 
-        // Rate limiting check
-        if (!rateLimiter.allowConnection(ip)) {
-            logger.warn("Rate limit exceeded for IP: {}", ip);
-            closeSession(session, 1008, "Rate limit exceeded.");
-            return;
+        if (!result.isSuccess()) {
+            closeSession(session, result.getStatusCode(), result.getMessage());
         }
-
-        // Check if IP is blocked
-        if (ipBlockService.isBlocked(ip)) {
-            logger.warn("Connection attempt from blocked IP: {}", ip);
-            closeSession(session, 1008, "Your IP is blocked.");
-            return;
-        }
-
-        logger.info("WebSocket Connected: {}", session.getRemoteAddress());
-
-        // Add user session
-        User user = userSessionManager.addSessionAnnonymousUser(session);
-
-        // If user is null, it means the session was rejected (e.g., blocked IP)
-        if (user == null) {
-            logger.warn("Failed to add user session for IP: {}", ip);
-            closeSession(session, 1008, "Connection rejected.");
-            return;
-        }
-        chatRoomService.handleUserJoin(user);
 
         sendUserList(session);
         broadcastUserList();
-
-        logger.info("User connected: {} ({}), total users: {}",
-            user.getDisplayName(), user.getUserId(), userSessionManager.getUserCount());
     }
 
     /**
@@ -94,51 +55,15 @@ public class ChatWebSocketHandler {
      */
     @OnWebSocketMessage
     public void onMessage(Session session, String message) {
-        logger.debug("Received message from {}: {}",
-            session.getRemoteAddress(), message);
-        
-        User sender = userSessionManager.getUserBySession(session);
-        if (sender == null) {
-            logger.warn("Received message from unknown session: {}", session.getRemoteAddress());
+        MessageResult result = webSocketConnectionService.handleMessage(session, message);
+
+        if (!result.isSuccess()) {
+            logger.debug("Message processing failed: {}", result.getErrorMessage());
             return;
         }
 
-        String ip = sender.getIpAddress();
-
-        if (!rateLimiter.allowMessage(ip)) {
-            logger.warn("Rate limit exceeded for IP: {}", ip);
-            return;
-        }
-
-        try {
-            MessageRequest messageRequest = JsonUtil.fromJson(message, MessageRequest.class);
-
-            if (messageRequest == null) {
-                logger.warn("Failed to parse meessage request");
-                return;
-            }
-
-            if (messageRequest.isUserListRequest()) {
-                logger.info("User list requested by: {}", sender.getUsername());
-                sendUserList(session);
-                return;
-            }
-
-
-            ChatMessage chatMessage = JsonUtil.fromJson(message, ChatMessage.class);
-
-            if (chatMessage == null || chatMessage.getContent() == null) {
-                logger.warn("Invalid message format from user {}: {}",
-                    sender.getUsername(), message);
-                return;
-            }
-
-            String sanitizedContent = InputValidator.sanitizeHtml(chatMessage.getContent());
-
-            chatRoomService.handleChatMessage(sender, sanitizedContent);
-        } catch (Exception e) {
-            logger.error("Error processing message from user {}: {}",
-                sender.getUsername(), e.getMessage());
+        if (result.isUserListRequest()) {
+            sendUserList(session);
         }
     }
 
@@ -150,19 +75,11 @@ public class ChatWebSocketHandler {
      */
     @OnWebSocketClose
     public void onClose(Session session, int statusCode, String reason) {
-        logger.info("WebSocket Closed: {} (code: {}, reason: {})",
+        logger.info("WebSocket Closed: {} (code: {}, reason: {}",
             session.getRemoteAddress(), statusCode, reason);
-
-        User user = userSessionManager.getUserBySession(session);
-        if (user != null) {
-            chatRoomService.handleUserLeave(user);
-            userSessionManager.removeSession(session);
-
-            broadcastUserList();
-
-            logger.info("User disconnected: {} ({}), total users: {}",
-                user.getUsername(), user.getUserId(), userSessionManager.getUserCount());
-        }
+        
+        webSocketConnectionService.handleDisconnection(session);
+        broadcastUserList();        
     }
 
     /**
@@ -174,10 +91,7 @@ public class ChatWebSocketHandler {
     public void onError(Session session, Throwable error) {
         logger.error("WebSocket Error on session {}: {}",
             session.getRemoteAddress(), error);
-        User user = userSessionManager.getUserBySession(session);
-        if (user != null) {
-            userSessionManager.removeSession(session);
-        }
+        webSocketConnectionService.handleDisconnection(session);
     }
 
     /**
@@ -205,7 +119,7 @@ public class ChatWebSocketHandler {
     private void sendUserList(Session session) {
         try {
             if (session != null && session.isOpen()) {
-                UserListResponse userList = userSessionManager.getUserListResponse();
+                UserListResponse userList = webSocketConnectionService.getUserListResponse();
                 String jsonResponse = JsonUtil.toJson(userList);
                 session.getRemote().sendString(jsonResponse);
                 logger.debug("Sent user list to session {}: {}",
@@ -220,18 +134,11 @@ public class ChatWebSocketHandler {
      * Broadcast the current user list to all connected users.
      */
     private void broadcastUserList() {
-        UserListResponse userList = userSessionManager.getUserListResponse();
+        UserListResponse userList = webSocketConnectionService.getUserListResponse();
         String jsonResponse = JsonUtil.toJson(userList);
 
-        userSessionManager.getAllUsers().forEach(user -> {
-            try {
-                if (user.getSession() != null && user.getSession().isOpen()) {
-                    user.getSession().getRemote().sendString(jsonResponse);
-                }
-            } catch (IOException e) {
-                logger.error("Failed to broadcast user list to user: {}", user.getUsername());
-            }
-        });
+        webSocketConnectionService.broadcastUserList(jsonResponse);
+
         logger.debug("Broadcasted user list: {} users", userList.getTotalCount());
     }
 }

@@ -28,17 +28,15 @@ public class UserSessionManager {
 
     private final Map<String, User> users; // Map of userId to User
     private final Map<Session, String> sessionToUserId; // Map of Session to userId
-    private final IpBlockService ipBlockService;
 
     /**
      * Constructor.
      * Initializes the user session manager.
      */
     @Inject
-    public UserSessionManager(IpBlockService ipBlockService) {
+    public UserSessionManager() {
         this.users = new ConcurrentHashMap<>();
         this.sessionToUserId = new ConcurrentHashMap<>();
-        this.ipBlockService = ipBlockService;
         logger.info("UserSessionManager initialized.");
     }
 
@@ -48,16 +46,9 @@ public class UserSessionManager {
      * @param session The WebSocket session
      * @return The created User object
      */
-    public User addSessionAnnonymousUser(Session session) {
+    public User addSessionAnonymousUser(Session session) {
         String ip = IpUtil.extractIpAddress(session);
         String maskedIp = IpUtil.getDisplayIp(ip);
-
-        // Check if IP is blocked
-        if (ipBlockService.isBlocked(ip)) {
-            logger.warn("Connection attempt from blocked IP: {}", ip);
-            return null;
-        }
-
         String userId = IdGenerator.generateUserId();
         String username = NameGenerator.generateAnonymousName();
         User user = new User(userId, username, session, ip, maskedIp, false);

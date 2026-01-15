@@ -11,6 +11,7 @@ import com.bang9634.common.database.TransactionManager;
 import com.bang9634.common.security.RateLimiter;
 import com.bang9634.user.service.IpBlockService;
 import com.bang9634.user.service.UserSessionManager;
+import com.bang9634.websocket.service.WebSocketConnectionService;
 import com.google.inject.AbstractModule;
 
 /**
@@ -29,6 +30,9 @@ public class ApplicationModule extends AbstractModule {
     @Override
     protected void configure() {
         bind(DataSource.class).toProvider(DataSourceProvider.class).asEagerSingleton();
+
+        // websocket
+        bind(WebSocketConnectionService.class).asEagerSingleton();
 
         // common/database
         bind(ConnectionPool.class).asEagerSingleton();
